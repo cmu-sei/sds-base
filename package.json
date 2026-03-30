@@ -1,0 +1,22 @@
+{
+  "name": "@cmu-sei/sds-base-layer",
+  "type": "module",
+  "version": "0.1.0",
+  "main": "./nuxt.config.ts",
+  "scripts": {
+    "dev": "npx nuxi dev",
+    "dev:prepare": "npx nuxt prepare",
+    "build": "npx nuxt build"
+  },
+  "dependencies": {
+    "@cmu-sei/sei-design-system": "^4.7.0",
+    "@tailwindcss/forms": "^0.5.11",
+    "@tailwindcss/vite": "^4.2.1",
+    "tailwindcss": "^4.0.12"
+  },
+  "devDependencies": {
+    "nuxt": "^4.1.2",
+    "typescript": "^5.9.3",
+    "vue": "latest"
+  }
+}
