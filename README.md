@@ -142,29 +142,6 @@ This layer provides only the SDS foundation. It does not include:
 
 For a full documentation site setup, use `@cmu-sei/sds-documentation-site` which provides all of the above.
 
-## NuxtLink Wrappers (sds-nuxt-link)
-
-The embedded `sds-nuxt-link` sub-layer automatically wraps four SDS components to use `<NuxtLink>` for internal routes, enabling client-side navigation without full-page reloads.
-
-### Wrapped Components
-
-| Component | Strategy |
-|---|---|
-| `SdsLink` | Renders `<NuxtLink>` directly for internal routes; falls back to the original for external links |
-| `SdsNavigationItem` | Renderless NuxtLink (`custom` mode) injects client-side navigation into click handlers |
-| `SdsActionButton` | Same renderless NuxtLink approach as SdsNavigationItem |
-| `SdsDropdownItem` | Intercepts `href` from `$attrs` and uses renderless NuxtLink for internal routes |
-
-All wrappers add a `to` prop accepting a Vue Router `RouteLocationRaw`.
-When `to` is provided, the wrapper routes via NuxtLink (client-side navigation). When `to` is omitted, the wrapper behaves like the original SDS component (e.g., `href` renders a normal anchor).
-
-```vue
-<SdsLink to="/about">About</SdsLink>
-<SdsActionButton :to="{ name: 'settings' }">Settings</SdsActionButton>
-```
-
-The existing `href` prop continues to work and is treated as a normal anchor attribute.
-
 ## File Structure
 
 ```
@@ -177,16 +154,6 @@ sds-base-layer/
     assets/
       css/
         main.css                              # Tailwind CSS entry point
-  layers/
-    sds-nuxt-link/                            # NuxtLink wrapper sub-layer
-      nuxt.config.ts
-      composables/
-        useIsInternalRoute.ts                 # Route classification composable
-      components/
-        SdsLink.vue
-        SdsNavigationItem.vue
-        SdsActionButton.vue
-        SdsDropdownItem.vue
 ```
 
 ## Dependencies
