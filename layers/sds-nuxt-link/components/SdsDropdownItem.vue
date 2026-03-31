@@ -1,37 +1,21 @@
 <template>
-  <!--
-    When the DropdownItem's tag is "a" (default) and an internal href is passed
-    via attrs, intercept with NuxtLink for client-side navigation.
-    Otherwise, delegate entirely to the original component.
-  -->
-  <NuxtLink
-    v-if="tag === 'a' && isInternal"
-    :to="to ?? attrHref!"
-    custom
-    v-slot="{ navigate, href: resolvedHref }"
+  <SdsNuxtLink
+    v-if="shouldUseNuxtLink"
+    :to="routeTarget!"
+    v-slot="{ navigate, isActive, isExactActive }"
   >
     <OriginalSdsDropdownItem
-      v-bind="filteredAttrs"
-      :variant="variant"
-      tag="a"
-      :close-on-click="closeOnClick"
-      :active="active"
-      :disabled="disabled"
-      :href="resolvedHref"
+      v-bind="{ ...$attrs, ...forwardedProps }"
+      :active="!!(isActive || isExactActive)"
       @click="navigate"
     >
       <slot />
     </OriginalSdsDropdownItem>
-  </NuxtLink>
+  </SdsNuxtLink>
 
   <OriginalSdsDropdownItem
     v-else
-    v-bind="$attrs"
-    :variant="variant"
-    :tag="tag"
-    :close-on-click="closeOnClick"
-    :active="active"
-    :disabled="disabled"
+    v-bind="{ ...$attrs, ...forwardedProps }"
   >
     <slot />
   </OriginalSdsDropdownItem>
@@ -40,43 +24,49 @@
 <script setup lang="ts">
 import { SdsDropdownItem as OriginalSdsDropdownItem } from '@cmu-sei/sei-design-system'
 import type { RouteLocationRaw } from 'vue-router'
+import { useIsInternalRoute } from '../composables/useIsInternalRoute'
+import { useAttrs } from 'vue'
 
 defineOptions({
   name: 'SdsDropdownItem',
   inheritAttrs: false
 })
 
+// Only the props the wrapper's own logic reads are declared here.
+// All other original SDS props pass through via $attrs.
+// Note: href is read from $attrs (not props) in this component.
+// DropdownItem has no `external` prop in SDS; it also doesn't need one
+// since the wrapper only checks isInternal for shouldUseNuxtLink.
 interface NuxtDropdownItemProps {
-  variant?: 'gray' | 'red'
-  tag?: string
-  closeOnClick?: boolean
-  active?: boolean
-  disabled?: boolean
   /**
-   * Vue Router route location. When provided, always uses NuxtLink.
+   * Vue Router route location. When provided, the wrapper routes via NuxtLink.
    */
   to?: RouteLocationRaw | null
 }
 
 const props = withDefaults(defineProps<NuxtDropdownItemProps>(), {
-  variant: 'gray',
-  tag: 'a',
-  closeOnClick: true,
-  active: false,
-  disabled: false,
   to: null
 })
 
 const attrs = useAttrs()
 
-// Extract href from attrs (since original DropdownItem receives it via fallthrough)
-const attrHref = computed(() => (attrs.href as string | undefined) ?? null)
-const resolvedHref = computed(() => props.to ?? attrHref.value)
-const isInternal = useIsInternalRoute(resolvedHref)
+// Determine the effective route target: explicit `to` takes priority, then `href` from attrs
+const routeTarget = computed<RouteLocationRaw | null>(() => {
+  if (props.to !== null) return props.to
+  const href = attrs.href as string | undefined
+  if (href) return href
+  return null
+})
 
-// Filter out href from attrs when we're handling it ourselves via NuxtLink
-const filteredAttrs = computed(() => {
-  const { href, ...rest } = attrs
+// Use NuxtLink when: we have a route target and it's internal
+const shouldUseNuxtLink = computed(() => {
+  if (routeTarget.value === null) return false
+  return useIsInternalRoute(routeTarget).value
+})
+
+// Forward all props except `to` (wrapper-only)
+const forwardedProps = computed(() => {
+  const { to, ...rest } = props
   return rest
 })
 </script>

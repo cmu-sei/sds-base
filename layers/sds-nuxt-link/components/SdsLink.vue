@@ -1,25 +1,21 @@
 <template>
-  <NuxtLink
-    v-if="isInternal && !external"
-    :to="to ?? href ?? undefined"
-    v-bind="$attrs"
-    :class="['link', kindClass, typeClass, variantClass, decorationClass, sizeClass, disabledClass]"
-    :tabindex="disabled ? -1 : undefined"
-    data-id="sds-link"
+  <SdsNuxtLink
+    v-if="shouldUseNuxtLink"
+    :to="routeTarget!"
+    v-slot="{ navigate }"
   >
-    <slot />
-  </NuxtLink>
+    <OriginalSdsLink
+      v-bind="{ ...$attrs, ...forwardedProps }"
+      :external="false"
+      @click="navigate"
+    >
+      <slot />
+    </OriginalSdsLink>
+  </SdsNuxtLink>
+
   <OriginalSdsLink
     v-else
-    v-bind="$attrs"
-    :kind="kind"
-    :type="type"
-    :variant="variant"
-    :decoration="decoration"
-    :size="size"
-    :external="external"
-    :disabled="disabled"
-    :href="href"
+    v-bind="{ ...$attrs, ...forwardedProps }"
   >
     <slot />
   </OriginalSdsLink>
@@ -28,112 +24,53 @@
 <script setup lang="ts">
 import { SdsLink as OriginalSdsLink } from '@cmu-sei/sei-design-system'
 import type { RouteLocationRaw } from 'vue-router'
+import { useIsInternalRoute } from '../composables/useIsInternalRoute'
+import { useAttrs } from 'vue'
 
 defineOptions({
   name: 'SdsLink',
   inheritAttrs: false
 })
 
+// Only the props the wrapper's own logic reads are declared here.
+// All other original SDS props pass through via $attrs.
+// Note: href is read from $attrs (not props) in this component.
 interface NuxtSdsLinkProps {
   /**
-   * Determines the purpose and particular function of the component.
-   */
-  kind?: 'primary' | 'secondary' | 'tertiary'
-  /**
-   * Determines the type of the component.
-   */
-  type?: 'standalone' | 'inline' | 'cta'
-  /**
-   * Determines the color variant of the component.
-   */
-  variant?: 'blue' | 'red' | 'white'
-  /**
-   * Determines whether to display a decorated underline.
-   */
-  decoration?: 'underline'
-  /**
-   * Determines the size of the component.
-   */
-  size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl'
-  /**
-   * Applies the appropriate attributes for external links and opens them in a new tab.
-   */
-  external?: boolean
-  /**
-   * Disables the component to prevent user interaction.
-   */
-  disabled?: boolean
-  /**
-   * URL for the link. When internal, NuxtLink handles client-side navigation.
-   */
-  href?: string | null
-  /**
-   * Vue Router route location. When provided, always uses NuxtLink.
+   * Vue Router route location. When provided, the wrapper routes via NuxtLink.
    */
   to?: RouteLocationRaw | null
+  /**
+   * Forwarded from original: controls external link behaviour.
+   * The wrapper reads this to decide whether to use NuxtLink.
+   */
+  external?: boolean
 }
 
 const props = withDefaults(defineProps<NuxtSdsLinkProps>(), {
-  kind: 'primary',
-  type: 'standalone',
-  variant: 'blue',
-  decoration: undefined,
-  size: undefined,
+  to: null,
   external: false,
-  disabled: false,
-  href: null,
-  to: null
 })
 
-// Determine if this is an internal route
-const resolvedHref = computed(() => props.to ?? props.href)
-const isInternal = useIsInternalRoute(resolvedHref)
+const attrs = useAttrs()
 
-// Replicate the class computations from the original SdsLink so that
-// the NuxtLink path renders with identical styling.
-const kindClass = computed(() => {
-  switch (props.kind) {
-    case 'secondary': return 'link-secondary'
-    case 'tertiary': return 'link-tertiary'
-    default: return 'link-primary'
-  }
+// Determine the effective route target: explicit `to` takes priority, then `href` from attrs
+const routeTarget = computed<RouteLocationRaw | null>(() => {
+  if (props.to !== null) return props.to
+  const href = attrs.href as string | undefined
+  if (href) return href
+  return null
 })
 
-const typeClass = computed(() => {
-  switch (props.type) {
-    case 'inline': return 'link-inline'
-    case 'cta': return 'link-cta'
-    default: return ''
-  }
+// Use NuxtLink when: we have a route target, it's internal, and not explicitly marked external
+const shouldUseNuxtLink = computed(() => {
+  if (props.external || routeTarget.value === null) return false
+  return useIsInternalRoute(routeTarget).value
 })
 
-const variantClass = computed(() => {
-  switch (props.variant) {
-    case 'red': return 'link-red'
-    case 'white': return 'link-white'
-    default: return 'link-blue'
-  }
+// Forward all props except `to` (wrapper-only) to the original component
+const forwardedProps = computed(() => {
+  const { to, ...rest } = props
+  return rest
 })
-
-const decorationClass = computed(() => {
-  if (!props.decoration) return ''
-  switch (props.variant) {
-    case 'red': return 'underline underline-offset-2 decoration-red-500'
-    case 'white': return 'underline underline-offset-2 decoration-white'
-    default: return 'underline underline-offset-2 decoration-blue-500'
-  }
-})
-
-const sizeClass = computed(() => {
-  if (!props.size) return ''
-  switch (props.size) {
-    case 'xs': return 'text-xs'
-    case 'sm': return 'text-sm'
-    case 'lg': return 'text-lg'
-    case 'xl': return 'text-xl'
-    default: return 'text-base'
-  }
-})
-
-const disabledClass = computed(() => props.disabled ? 'disabled' : '')
 </script>

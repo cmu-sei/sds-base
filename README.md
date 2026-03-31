@@ -155,14 +155,15 @@ The embedded `sds-nuxt-link` sub-layer automatically wraps four SDS components t
 | `SdsActionButton` | Same renderless NuxtLink approach as SdsNavigationItem |
 | `SdsDropdownItem` | Intercepts `href` from `$attrs` and uses renderless NuxtLink for internal routes |
 
-All wrappers add a `to` prop accepting a Vue Router `RouteLocationRaw`:
+All wrappers add a `to` prop accepting a Vue Router `RouteLocationRaw`.
+When `to` is provided, the wrapper routes via NuxtLink (client-side navigation). When `to` is omitted, the wrapper behaves like the original SDS component (e.g., `href` renders a normal anchor).
 
 ```vue
 <SdsLink to="/about">About</SdsLink>
 <SdsActionButton :to="{ name: 'settings' }">Settings</SdsActionButton>
 ```
 
-The existing `href` prop continues to work. Internal hrefs (e.g., `/about`, `features/overview`) are automatically detected and routed through NuxtLink. External URLs, `mailto:`, `tel:`, and anchor links behave normally.
+The existing `href` prop continues to work and is treated as a normal anchor attribute.
 
 ## File Structure
 

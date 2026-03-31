@@ -1,46 +1,24 @@
 <template>
-  <!--
-    When href is present, internal, and not marked external: use NuxtLink's
-    custom renderless mode to handle client-side navigation while preserving
-    the original ActionButton's full rendering (styles, pending state, etc.).
-  -->
-  <NuxtLink
-    v-if="isInternal && !external"
-    :to="to ?? href ?? undefined"
-    custom
-    v-slot="{ navigate, href: resolvedHref }"
+  <SdsNuxtLink
+    v-if="shouldUseNuxtLink"
+    :to="routeTarget!"
+    v-slot="{ navigate, href, isActive, isExactActive }"
   >
     <OriginalSdsActionButton
-      v-bind="$attrs"
-      :kind="kind"
-      :variant="variant"
-      :href="resolvedHref"
+      v-bind="{ ...$attrs, ...forwardedProps }"
+      :href="href"
       :external="false"
-      :type="type"
-      :size="size"
-      :active="active"
-      :disabled="disabled"
-      :block="block"
-      :pending="pending"
+      :active="!!(isActive || isExactActive)"
       @click="navigate"
     >
       <slot />
     </OriginalSdsActionButton>
-  </NuxtLink>
+  </SdsNuxtLink>
 
   <OriginalSdsActionButton
     v-else
-    v-bind="$attrs"
-    :kind="kind"
-    :variant="variant"
-    :href="href"
+    v-bind="{ ...$attrs, ...forwardedProps }"
     :external="external"
-    :type="type"
-    :size="size"
-    :active="active"
-    :disabled="disabled"
-    :block="block"
-    :pending="pending"
   >
     <slot />
   </OriginalSdsActionButton>
@@ -49,43 +27,54 @@
 <script setup lang="ts">
 import { SdsActionButton as OriginalSdsActionButton } from '@cmu-sei/sei-design-system'
 import type { RouteLocationRaw } from 'vue-router'
+import { useIsInternalRoute } from '../composables/useIsInternalRoute'
 
 defineOptions({
   name: 'SdsActionButton',
   inheritAttrs: false
 })
 
+// Only the props the wrapper's own logic reads are declared here.
+// All other original SDS props pass through via $attrs.
 interface NuxtActionButtonProps {
-  kind?: 'primary' | 'secondary' | 'ghost'
-  variant?: 'gray' | 'blue' | 'red' | 'white'
-  href?: string | null
-  external?: boolean
-  type?: 'button' | 'submit'
-  size?: 'xs' | 'sm' | 'md' | 'lg'
-  active?: boolean
-  disabled?: boolean
-  block?: boolean
-  pending?: boolean
   /**
-   * Vue Router route location. When provided, always uses NuxtLink.
+   * Vue Router route location. When provided, the wrapper routes via NuxtLink.
    */
   to?: RouteLocationRaw | null
+  /**
+   * Forwarded from original: determines the HTML tag (renders as <a> when set).
+   * The wrapper reads this to determine the route target.
+   */
+  href?: string | null
+  /**
+   * Forwarded from original: controls external link behaviour.
+   * The wrapper reads this to decide whether to use NuxtLink.
+   */
+  external?: boolean
 }
 
 const props = withDefaults(defineProps<NuxtActionButtonProps>(), {
-  kind: 'ghost',
-  variant: 'gray',
+  to: null,
   href: null,
   external: false,
-  type: 'button',
-  size: 'sm',
-  active: false,
-  disabled: false,
-  block: false,
-  pending: false,
-  to: null
 })
 
-const resolvedHref = computed(() => props.to ?? props.href)
-const isInternal = useIsInternalRoute(resolvedHref)
+// Determine the effective route target: explicit `to` takes priority, then `href`
+const routeTarget = computed<RouteLocationRaw | null>(() => {
+  if (props.to !== null) return props.to
+  if (props.href) return props.href
+  return null
+})
+
+// Use NuxtLink when: we have a route target, it's internal, and not explicitly marked external
+const shouldUseNuxtLink = computed(() => {
+  if (props.external || routeTarget.value == null) return false
+  return useIsInternalRoute(routeTarget).value
+})
+
+// Forward all wrapper props except `to` (wrapper-only)
+const forwardedProps = computed(() => {
+  const { to, ...rest } = props
+  return rest
+})
 </script>

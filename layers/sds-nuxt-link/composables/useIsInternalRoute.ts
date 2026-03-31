@@ -1,51 +1,44 @@
+import { computed, toValue, type MaybeRefOrGetter } from 'vue'
 import type { RouteLocationRaw } from 'vue-router'
 
 /**
- * Determines whether a given href/to value should be handled by NuxtLink
- * (internal route) or by a native <a> tag (external link).
- *
- * Internal routes:
- * - Relative paths (e.g. "about", "./about")
- * - Absolute paths starting with "/" (e.g. "/about")
- * - Vue Router route location objects (e.g. { name: 'about' })
- *
- * External/native links:
- * - Absolute URLs with a protocol (e.g. "https://example.com")
- * - mailto: / tel: links
- * - Hash-only anchors (e.g. "#section")
- * - javascript: URIs
- * - null / undefined / empty string
+ * Patterns that indicate a URL should NOT be routed via NuxtLink:
+ * - Absolute URLs with protocol (https://, http://, ftp://, etc.)
+ * - Protocol-relative URLs (//example.com)
+ * - Special protocol URIs (mailto:, tel:, javascript:)
+ * - Hash-only anchors (#section)
  */
-export function useIsInternalRoute(href: MaybeRefOrGetter<string | RouteLocationRaw | null | undefined>) {
+const EXTERNAL_PATTERN = /^(https?:|ftp:|\/\/|mailto:|tel:|javascript:|#)/i
+
+/**
+ * Determines whether a given href or route location should be treated as an
+ * internal route (handled by Vue Router / NuxtLink) or an external link
+ * (handled natively by the browser).
+ *
+ * @param href - A string URL, Vue Router location object, ref, getter, null, or undefined
+ * @returns A computed ref that is `true` when the value represents an internal route
+ */
+export function useIsInternalRoute(
+  href: MaybeRefOrGetter<string | RouteLocationRaw | null | undefined>
+) {
   return computed(() => {
     const value = toValue(href)
 
-    // No href — not a link at all
+    // Null, undefined, and empty strings are not links at all
     if (value == null || value === '') {
       return false
     }
 
-    // Route location objects are always internal
+    // Route location objects ({ path: '...', name: '...' }) are always internal
     if (typeof value === 'object') {
       return true
     }
 
-    // Protocol-relative URLs are external
-    if (value.startsWith('//')) {
-      return false
+    // String values: check against external patterns
+    if (typeof value === 'string') {
+      return !EXTERNAL_PATTERN.test(value)
     }
 
-    // Absolute URLs with a scheme are external
-    if (/^[a-z][a-z0-9+.-]*:/i.test(value)) {
-      return false
-    }
-
-    // Hash-only anchors stay native
-    if (value.startsWith('#')) {
-      return false
-    }
-
-    // Everything else (/, ./relative, relative) is internal
-    return true
+    return false
   })
 }
