@@ -1,5 +1,5 @@
 {
-  "name": "@cmu-sei/sds-base-layer",
+  "name": "@cmu-sei/sds-base",
   "type": "module",
   "version": "0.1.0",
   "main": "./nuxt.config.ts",
