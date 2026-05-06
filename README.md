@@ -8,7 +8,6 @@ A Nuxt 4 layer that provides a one-line installation of the [SEI Design System](
 - **Volar type support** for SDS components in your IDE
 - **CSS configuration** — Open Sans font, SDS component styles, and Tailwind CSS (with `@tailwindcss/forms`)
 - **Build transpilation** for `@cmu-sei/sei-design-system`
-- **sds-nuxt-link layer** — NuxtLink-aware wrappers for `SdsLink`, `SdsNavigationItem`, `SdsActionButton`, and `SdsDropdownItem` that enable client-side routing while preserving external link behavior
 
 ## Quick Start
 
@@ -23,7 +22,7 @@ export default defineNuxtConfig({
 })
 ```
 
-That's it. All SDS components, styles, and NuxtLink wrappers are now available in your application.
+That's it. All SDS components and styles are now available in your application.
 
 ## Setting Up a New Project from Scratch
 
@@ -146,7 +145,7 @@ For a full documentation site setup, use `@cmu-sei/sds-documentation-site` which
 
 ```
 sds-base-layer/
-  nuxt.config.ts                              # Layer config (CSS, transpile, Tailwind, extends sds-nuxt-link)
+  nuxt.config.ts                              # Layer config (CSS, transpile, Tailwind)
   package.json                                # @cmu-sei/sds-base-layer
   app/
     plugins/
