@@ -1,4 +1,4 @@
-# @cmu-sei/sds-base-layer
+# @cmu-sei/sds-base
 
 A Nuxt 4 layer that provides a one-line installation of the [SEI Design System](https://designsystem.sei.cmu.edu/) for any Nuxt application. It handles global component registration, CSS setup (including Open Sans and Tailwind CSS), build transpilation, and client-side routing wrappers for SDS navigation components.
 
@@ -12,13 +12,13 @@ A Nuxt 4 layer that provides a one-line installation of the [SEI Design System](
 ## Quick Start
 
 ```bash
-npm install @cmu-sei/sds-base-layer
+npm install @cmu-sei/sds-base
 ```
 
 ```ts
 // nuxt.config.ts
 export default defineNuxtConfig({
-  extends: ['@cmu-sei/sds-base-layer']
+  extends: ['@cmu-sei/sds-base']
 })
 ```
 
@@ -26,7 +26,7 @@ That's it. All SDS components and styles are now available in your application.
 
 ## Setting Up a New Project from Scratch
 
-Below is a complete walkthrough for creating a new Nuxt app that uses `sds-base-layer`. These are the exact steps used to create and verify the initial test project.
+Below is a complete walkthrough for creating a new Nuxt app that uses `sds-base`. These are the exact steps used to create and verify the initial test project.
 
 ### 1. Create the project directory
 
@@ -70,7 +70,7 @@ registry=https://artifacts.sei.cmu.edu/artifactory/api/npm/npm-virtual/
     "build": "npx nuxt build"
   },
   "dependencies": {
-    "@cmu-sei/sds-base-layer": "^0.1.0"
+    "@cmu-sei/sds-base: "^0.1.0"
   },
   "devDependencies": {
     "nuxt": "^4.1.2",
@@ -84,7 +84,7 @@ registry=https://artifacts.sei.cmu.edu/artifactory/api/npm/npm-virtual/
 
 ```ts
 export default defineNuxtConfig({
-  extends: ['@cmu-sei/sds-base-layer'],
+  extends: ['@cmu-sei/sds-base'],
   compatibilityDate: '2025-01-22',
   devtools: { enabled: true },
 })
@@ -118,12 +118,12 @@ All 54+ SDS components are available in templates without imports. The `sds-them
 
 ## Using with Other Layers
 
-When combining `sds-base-layer` with other Nuxt layers, list it first in the `extends` array so that higher-level layers can build on the SDS foundation it provides:
+When combining `sds-base` with other Nuxt layers, list it first in the `extends` array so that higher-level layers can build on the SDS foundation it provides:
 
 ```ts
 export default defineNuxtConfig({
   extends: [
-    '@cmu-sei/sds-base-layer',
+    '@cmu-sei/sds-base',
     // additional layers here
   ]
 })
@@ -144,9 +144,9 @@ For a full documentation site setup, use `@cmu-sei/sds-documentation-site` which
 ## File Structure
 
 ```
-sds-base-layer/
+sds-base/
   nuxt.config.ts                              # Layer config (CSS, transpile, Tailwind)
-  package.json                                # @cmu-sei/sds-base-layer
+  package.json                                # @cmu-sei/sds-base
   app/
     plugins/
       sei-design-system.ts                    # Global SDS registration + Volar types
