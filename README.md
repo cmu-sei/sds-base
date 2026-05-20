@@ -1,12 +1,12 @@
 # @cmu-sei/sds-base
 
-A Nuxt 4 layer that provides a one-line installation of the [SEI Design System](https://designsystem.sei.cmu.edu/) for any Nuxt application. It handles global component registration, CSS setup (including Open Sans and Tailwind CSS), build transpilation, and client-side routing wrappers for SDS navigation components.
+A Nuxt 4 layer that provides a one-line installation of the [SEI Design System](https://designsystem.sei.cmu.edu/) for any Nuxt application. It handles global component registration, CSS setup (including Open Sans and Tailwind CSS), and build transpilation.
 
 ## What's Included
 
 - **Global SDS component registration** via a Nuxt plugin — all 54+ SDS components are available in templates without explicit imports
 - **Volar type support** for SDS components in your IDE
-- **CSS configuration** — Open Sans font, SDS component styles, and Tailwind CSS (with `@tailwindcss/forms`)
+- **CSS configuration** — Open Sans font, SDS component styles, and Tailwind CSS
 - **Build transpilation** for `@cmu-sei/sei-design-system`
 
 ## Quick Start
@@ -23,6 +23,23 @@ export default defineNuxtConfig({
 ```
 
 That's it. All SDS components and styles are now available in your application.
+
+## Choosing a Theme
+
+`sds-base` ships with the `forge` theme applied by default. To switch to `plaid`,
+create an `app/app.config.ts` in your consuming app:
+
+```ts
+// app/app.config.ts
+export default defineAppConfig({
+  sdsBase: {
+    theme: 'plaid', // 'forge' | 'plaid'
+  },
+})
+```
+
+The layer reads `sdsBase.theme` from `useAppConfig()` and applies the
+corresponding `sds-theme-*` class to the `<html>` element.
 
 ## Setting Up a New Project from Scratch
 
@@ -114,7 +131,7 @@ Create `app/app.vue` to start building your application with SDS components:
 </template>
 ```
 
-All 54+ SDS components are available in templates without imports. The `sds-theme-forge` theme is applied automatically.
+All 54+ SDS components are available in templates without imports. The `sds-theme-forge` theme is applied automatically. To switch to `plaid`, see [Choosing a Theme](#choosing-a-theme) above.
 
 ## Using with Other Layers
 
@@ -148,6 +165,7 @@ sds-base/
   nuxt.config.ts                              # Layer config (CSS, transpile, Tailwind)
   package.json                                # @cmu-sei/sds-base
   app/
+    app.config.ts                             # Default theme config (forge|plaid)
     plugins/
       sei-design-system.ts                    # Global SDS registration + Volar types
     assets/
@@ -162,7 +180,6 @@ sds-base/
 | `@cmu-sei/sei-design-system` | SDS component library |
 | `tailwindcss` | Utility-first CSS framework |
 | `@tailwindcss/vite` | Tailwind CSS Vite plugin |
-| `@tailwindcss/forms` | Form element reset (required by SDS Tailwind config) |
 
 ## Requirements
 
