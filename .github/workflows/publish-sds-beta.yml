@@ -1,0 +1,15 @@
+name: Publish Beta Package
+
+on:
+  workflow_dispatch:
+
+jobs:
+  publish:
+    permissions:
+      contents: read
+      packages: write
+    uses: ./.github/workflows/publish-sds-common.yml
+    with:
+      channel: beta
+      checkout_ref: develop
+      validation_command: npm run dev:prepare && npm run lint --if-present && npm test --if-present && npm run build

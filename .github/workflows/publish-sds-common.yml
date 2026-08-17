@@ -1,0 +1,157 @@
+name: Publish Package With Latest SDS
+
+on:
+  workflow_call:
+    inputs:
+      channel:
+        description: SDS and package channel (production or beta)
+        required: true
+        type: string
+      checkout_ref:
+        description: Branch, tag, or commit to package
+        required: true
+        type: string
+      validation_command:
+        description: Command run before packaging
+        required: false
+        default: npm test --if-present && npm run build --if-present
+        type: string
+
+env:
+  SDS_PACKAGE: '@cmu-sei/sei-design-system'
+  REGISTRY_URL: 'https://npm.pkg.github.com'
+
+concurrency:
+  group: publish-sds-${{ github.repository }}-${{ inputs.channel }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Validate channel
+        env:
+          CHANNEL: ${{ inputs.channel }}
+        run: test "$CHANNEL" = production -o "$CHANNEL" = beta
+
+      - name: Checkout package source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.checkout_ref }}
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+          registry-url: ${{ env.REGISTRY_URL }}
+          scope: '@cmu-sei'
+
+      - name: Configure registries
+        run: |
+          npm config set registry https://registry.npmjs.org
+          npm config set @cmu-sei:registry "$REGISTRY_URL"
+
+      - name: Update to the latest SDS release
+        id: sds
+        env:
+          CHANNEL: ${{ inputs.channel }}
+          NODE_AUTH_TOKEN: ${{ github.token }}
+        run: |
+          dist_tag=latest
+          if [ "$CHANNEL" = beta ]; then
+            dist_tag=beta
+          fi
+
+          latest=$(npm view "$SDS_PACKAGE" "dist-tags.$dist_tag" --registry="$REGISTRY_URL")
+          current=$(node -p "require('./package-lock.json').packages['node_modules/$SDS_PACKAGE'].version")
+          update=$(npm exec --yes --package=semver -- semver "$latest" -r ">$current")
+
+          if [ -n "$update" ]; then
+            npm install --ignore-scripts --save-exact "$SDS_PACKAGE@$latest"
+            changed=true
+          else
+            changed=false
+          fi
+
+          {
+            echo "changed=$changed"
+            echo "current=$current"
+            echo "latest=$latest"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Install dependencies
+        env:
+          NODE_AUTH_TOKEN: ${{ github.token }}
+        run: npm ci --ignore-scripts
+
+      - name: Set beta package version
+        if: inputs.channel == 'beta'
+        env:
+          RUN_NUMBER: ${{ github.run_number }}
+        run: |
+          version=$(node -p "require('./package.json').version.split('-')[0]")
+          npm version "$version-beta.$RUN_NUMBER" --no-git-tag-version
+
+      - name: Validate package
+        env:
+          VALIDATION_COMMAND: ${{ inputs.validation_command }}
+        run: bash -euo pipefail -c "$VALIDATION_COMMAND"
+
+      - name: Check package version
+        id: package
+        env:
+          NODE_AUTH_TOKEN: ${{ github.token }}
+        run: |
+          package=$(node -p "require('./package.json').name")
+          version=$(node -p "require('./package.json').version")
+          if npm view "$package@$version" version --registry="$REGISTRY_URL" >/dev/null 2>&1; then
+            echo "Package $package@$version is already published." >&2
+            exit 1
+          fi
+          {
+            echo "name=$package"
+            echo "version=$version"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Build package artifact
+        id: pack
+        run: |
+          tarball=$(npm pack --ignore-scripts --json | node -e '
+            let input = ""
+            process.stdin.on("data", (chunk) => input += chunk)
+            process.stdin.on("end", () => process.stdout.write(JSON.parse(input)[0].filename))
+          ')
+          echo "tarball=$tarball" >> "$GITHUB_OUTPUT"
+
+      - name: Publish package
+        env:
+          CHANNEL: ${{ inputs.channel }}
+          NODE_AUTH_TOKEN: ${{ github.token }}
+          TARBALL: ${{ steps.pack.outputs.tarball }}
+        run: |
+          tag=latest
+          if [ "$CHANNEL" = beta ]; then
+            tag=beta
+          fi
+          npm publish "./$TARBALL" --ignore-scripts --tag "$tag"
+
+      - name: Summarize release
+        env:
+          CHANGED: ${{ steps.sds.outputs.changed }}
+          CURRENT_SDS: ${{ steps.sds.outputs.current }}
+          LATEST_SDS: ${{ steps.sds.outputs.latest }}
+          PACKAGE_NAME: ${{ steps.package.outputs.name }}
+          PACKAGE_VERSION: ${{ steps.package.outputs.version }}
+        run: |
+          {
+            echo "### Published $PACKAGE_NAME@$PACKAGE_VERSION"
+            echo
+            echo "SDS before run: $CURRENT_SDS"
+            echo "SDS packaged: $LATEST_SDS"
+            echo "SDS updated: $CHANGED"
+          } >> "$GITHUB_STEP_SUMMARY"
