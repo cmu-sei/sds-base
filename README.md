@@ -12,6 +12,7 @@ A Nuxt 4 layer that provides a one-line installation of the [SEI Design System](
 ## Quick Start
 
 ```bash
+# @cmu-sei:registry=https://npm.pkg.github.com
 npm install @cmu-sei/sds-base
 ```
 
@@ -65,16 +66,6 @@ Then switch to that version:
 nvm use
 ```
 
-### 3. Configure the npm registry
-
-Create an `.npmrc` file so the `@cmu-sei` scoped packages resolve correctly:
-
-```ini
-strict-ssl=true
-registry=https://artifacts.sei.cmu.edu/artifactory/api/npm/npm-virtual/
-@cmu-sei:registry=https://artifacts.sei.cmu.edu/artifactory/api/npm/sei-design-system-remote/
-```
-
 ### 4. Create `package.json`
 
 ```json
@@ -87,7 +78,7 @@ registry=https://artifacts.sei.cmu.edu/artifactory/api/npm/npm-virtual/
     "build": "npx nuxt build"
   },
   "dependencies": {
-    "@cmu-sei/sds-base: "^0.1.0"
+    "@cmu-sei/sds-base": "^0.1.0"
   },
   "devDependencies": {
     "nuxt": "^4.1.2",

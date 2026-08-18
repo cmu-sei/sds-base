@@ -1,10 +1,14 @@
 import tailwindcss from '@tailwindcss/vite'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
+
+const currentDir = dirname(fileURLToPath(import.meta.url))
 
 // https://nuxt.com/docs/api/configuration/nuxt-config
 export default defineNuxtConfig({
   css: [
     '@cmu-sei/sei-design-system/open-sans/index.css',
-    '../app/assets/css/main.css',
+    join(currentDir, 'app/assets/css/main.css'),
     '@cmu-sei/sei-design-system/dist/style.css',
   ],
   build: {

@@ -1,8 +1,23 @@
 {
   "name": "@cmu-sei/sds-base",
+  "description": "Nuxt layer for the SEI Design System",
   "type": "module",
   "version": "0.1.0",
   "main": "./nuxt.config.ts",
+  "files": [
+    "app",
+    "nuxt.config.ts"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/cmu-sei/sds-base.git"
+  },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  },
   "scripts": {
     "dev": "npx nuxi dev",
     "dev:prepare": "npx nuxt prepare",
@@ -15,7 +30,7 @@
     "tailwindcss": "^4.0.12"
   },
   "devDependencies": {
-    "nuxt": "^4.1.2",
+    "nuxt": "4.5.2",
     "typescript": "^5.9.3",
     "vue": "latest"
   }
