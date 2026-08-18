@@ -69,9 +69,7 @@ jobs:
 
           latest=$(npm view "$SDS_PACKAGE" "dist-tags.$dist_tag" --registry="$REGISTRY_URL")
           current=$(node -p "require('./package-lock.json').packages['node_modules/$SDS_PACKAGE'].version")
-          update=$(npm exec --yes --package=semver -- semver "$latest" -r ">$current")
-
-          if [ -n "$update" ]; then
+          if npm exec --yes --package=semver -- semver "$latest" -r ">$current" --include-prerelease >/dev/null; then
             npm install --ignore-scripts --save-exact "$SDS_PACKAGE@$latest"
             changed=true
           else
