@@ -2,14 +2,25 @@ name: Publish Production Package
 
 on:
   workflow_dispatch:
+    inputs:
+      version_bump:
+        description: Version component to increment
+        required: true
+        default: patch
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
 
 jobs:
   publish:
     permissions:
-      contents: read
+      contents: write
       packages: write
     uses: ./.github/workflows/publish-sds-common.yml
     with:
       channel: production
       checkout_ref: main
+      version_bump: ${{ inputs.version_bump }}
       validation_command: npm run dev:prepare && npm run lint --if-present && npm test --if-present && npm run build
