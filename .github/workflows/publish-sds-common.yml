@@ -11,6 +11,10 @@ on:
         description: Branch, tag, or commit to package
         required: true
         type: string
+      version_bump:
+        description: Semantic version component to increment
+        required: true
+        type: string
       validation_command:
         description: Command run before packaging
         required: false
@@ -29,14 +33,17 @@ jobs:
   publish:
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      contents: write
       packages: write
 
     steps:
       - name: Validate channel
         env:
           CHANNEL: ${{ inputs.channel }}
-        run: test "$CHANNEL" = production -o "$CHANNEL" = beta
+          VERSION_BUMP: ${{ inputs.version_bump }}
+        run: |
+          test "$CHANNEL" = production -o "$CHANNEL" = beta
+          test "$VERSION_BUMP" = patch -o "$VERSION_BUMP" = minor -o "$VERSION_BUMP" = major
 
       - name: Checkout package source
         uses: actions/checkout@v4
@@ -87,13 +94,23 @@ jobs:
           NODE_AUTH_TOKEN: ${{ github.token }}
         run: npm ci --ignore-scripts
 
-      - name: Set beta package version
-        if: inputs.channel == 'beta'
+      - name: Set package version
         env:
+          CHANNEL: ${{ inputs.channel }}
+          NODE_AUTH_TOKEN: ${{ github.token }}
           RUN_NUMBER: ${{ github.run_number }}
+          VERSION_BUMP: ${{ inputs.version_bump }}
         run: |
-          version=$(node -p "require('./package.json').version.split('-')[0]")
-          npm version "$version-beta.$RUN_NUMBER" --no-git-tag-version
+          package=$(node -p "require('./package.json').name")
+          current=$(npm view "$package" dist-tags.latest --registry="$REGISTRY_URL" 2>/dev/null || true)
+          if [ -z "$current" ]; then
+            current=$(node -p "require('./package.json').version")
+          fi
+          version=$(npm exec --yes --package=semver -- semver "$current" -i "$VERSION_BUMP")
+          if [ "$CHANNEL" = beta ]; then
+            version="$version-beta.$RUN_NUMBER"
+          fi
+          npm version "$version" --no-git-tag-version
 
       - name: Validate package
         env:
@@ -137,6 +154,26 @@ jobs:
             tag=beta
           fi
           npm publish "./$TARBALL" --ignore-scripts --tag "$tag"
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CHANNEL: ${{ inputs.channel }}
+          PACKAGE_NAME: ${{ steps.package.outputs.name }}
+          PACKAGE_VERSION: ${{ steps.package.outputs.version }}
+          TARBALL: ${{ steps.pack.outputs.tarball }}
+        run: |
+          release_args=()
+          if [ "$CHANNEL" = beta ]; then
+            release_args+=(--prerelease)
+          fi
+          target=$(git rev-parse HEAD)
+          gh release create "v$PACKAGE_VERSION" "./$TARBALL" \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$target" \
+            --title "$PACKAGE_NAME@$PACKAGE_VERSION" \
+            --generate-notes \
+            "${release_args[@]}"
 
       - name: Summarize release
         env:
