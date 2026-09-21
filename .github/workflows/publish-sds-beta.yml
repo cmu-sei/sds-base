@@ -12,6 +12,8 @@ on:
           - patch
           - minor
           - major
+  repository_dispatch:
+    types: [sds-beta-published]
 
 jobs:
   publish:
@@ -22,5 +24,8 @@ jobs:
     with:
       channel: beta
       checkout_ref: develop
-      version_bump: ${{ inputs.version_bump }}
+      version_bump: ${{ inputs.version_bump || '' }}
+      sds_previous_version: ${{ github.event.client_payload.sds_previous_version || '' }}
+      sds_version: ${{ github.event.client_payload.sds_version || '' }}
+      source_run: ${{ github.event.client_payload.source_run || '' }}
       validation_command: npm run dev:prepare && npm run lint --if-present && npm test --if-present && npm run build

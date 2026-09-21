@@ -12,8 +12,24 @@ on:
         required: true
         type: string
       version_bump:
-        description: Semantic version component to increment
-        required: true
+        description: Semantic version component for a manual release
+        required: false
+        default: ''
+        type: string
+      sds_previous_version:
+        description: Previous production SDS version for an automated release
+        required: false
+        default: ''
+        type: string
+      sds_version:
+        description: Exact SDS version for an automated release
+        required: false
+        default: ''
+        type: string
+      source_run:
+        description: Upstream SDS Actions run identifier
+        required: false
+        default: ''
         type: string
       validation_command:
         description: Command run before packaging
@@ -38,12 +54,52 @@ jobs:
 
     steps:
       - name: Validate channel
+        id: release
         env:
           CHANNEL: ${{ inputs.channel }}
+          SDS_PREVIOUS_VERSION: ${{ inputs.sds_previous_version }}
+          SDS_VERSION: ${{ inputs.sds_version }}
+          SOURCE_RUN: ${{ inputs.source_run }}
           VERSION_BUMP: ${{ inputs.version_bump }}
         run: |
           test "$CHANNEL" = production -o "$CHANNEL" = beta
-          test "$VERSION_BUMP" = patch -o "$VERSION_BUMP" = minor -o "$VERSION_BUMP" = major
+
+          if [ -n "$SDS_VERSION" ]; then
+            test -n "$SDS_PREVIOUS_VERSION"
+            test -n "$SOURCE_RUN"
+            previous_core=$(npm exec --yes --package=semver -- semver "$SDS_PREVIOUS_VERSION")
+            previous_core=${previous_core%%-*}
+            previous_core=${previous_core%%+*}
+            next_core=$(npm exec --yes --package=semver -- semver "$SDS_VERSION")
+            next_core=${next_core%%-*}
+            next_core=${next_core%%+*}
+            npm exec --yes --package=semver -- semver "$next_core" -r ">$previous_core" >/dev/null
+
+            previous_major=${previous_core%%.*}
+            previous_minor_patch=${previous_core#*.}
+            previous_minor=${previous_minor_patch%%.*}
+            next_major=${next_core%%.*}
+            next_minor_patch=${next_core#*.}
+            next_minor=${next_minor_patch%%.*}
+
+            if [ "$next_major" != "$previous_major" ]; then
+              version_bump="major"
+            elif [ "$next_minor" != "$previous_minor" ]; then
+              version_bump="minor"
+            else
+              version_bump="patch"
+            fi
+          else
+            test "$VERSION_BUMP" = patch -o "$VERSION_BUMP" = minor -o "$VERSION_BUMP" = major
+            version_bump="$VERSION_BUMP"
+          fi
+
+          {
+            echo "automated=$([ -n "$SDS_VERSION" ] && echo true || echo false)"
+            echo "sds_version=$SDS_VERSION"
+            echo "source_run=$SOURCE_RUN"
+            echo "version_bump=$version_bump"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Checkout package source
         uses: actions/checkout@v4
@@ -68,15 +124,21 @@ jobs:
         env:
           CHANNEL: ${{ inputs.channel }}
           NODE_AUTH_TOKEN: ${{ github.token }}
+          REQUESTED_SDS_VERSION: ${{ steps.release.outputs.sds_version }}
         run: |
           dist_tag=latest
           if [ "$CHANNEL" = beta ]; then
             dist_tag=beta
           fi
 
-          latest=$(npm view "$SDS_PACKAGE" "dist-tags.$dist_tag" --registry="$REGISTRY_URL")
+          latest="$REQUESTED_SDS_VERSION"
+          if [ -z "$latest" ]; then
+            latest=$(npm view "$SDS_PACKAGE" "dist-tags.$dist_tag" --registry="$REGISTRY_URL")
+          else
+            npm view "$SDS_PACKAGE@$latest" version --registry="$REGISTRY_URL" >/dev/null
+          fi
           current=$(node -p "require('./package-lock.json').packages['node_modules/$SDS_PACKAGE'].version")
-          if npm exec --yes --package=semver -- semver "$latest" -r ">$current" --include-prerelease >/dev/null; then
+          if [ -n "$REQUESTED_SDS_VERSION" ] || npm exec --yes --package=semver -- semver "$latest" -r ">$current" --include-prerelease >/dev/null; then
             npm install --ignore-scripts --save-exact "$SDS_PACKAGE@$latest"
             changed=true
           else
@@ -94,12 +156,45 @@ jobs:
           NODE_AUTH_TOKEN: ${{ github.token }}
         run: npm ci --ignore-scripts
 
+      - name: Check for an existing automated release
+        id: existing
+        env:
+          AUTOMATED: ${{ steps.release.outputs.automated }}
+          CHANNEL: ${{ inputs.channel }}
+          GH_TOKEN: ${{ github.token }}
+          NODE_AUTH_TOKEN: ${{ github.token }}
+          REQUESTED_SDS_VERSION: ${{ steps.release.outputs.sds_version }}
+        run: |
+          found=false
+          if [ "$AUTOMATED" = true ]; then
+            marker="SDS-Version: $REQUESTED_SDS_VERSION"
+            if gh api --paginate "repos/$GITHUB_REPOSITORY/releases?per_page=100" \
+              --jq '.[].body // ""' | grep -Fxq "$marker"; then
+              found=true
+            fi
+
+            package=$(node -p "require('./package.json').name")
+            dist_tag=latest
+            if [ "$CHANNEL" = beta ]; then
+              dist_tag=beta
+            fi
+            published_sds=$(npm view "$package" "dist-tags.$dist_tag" --registry="$REGISTRY_URL" 2>/dev/null \
+              | xargs -I{} npm view "$package@{}" "dependencies.$SDS_PACKAGE" --registry="$REGISTRY_URL" 2>/dev/null \
+              || true)
+            if [ "$published_sds" = "$REQUESTED_SDS_VERSION" ]; then
+              found=true
+            fi
+          fi
+          echo "found=$found" >> "$GITHUB_OUTPUT"
+
       - name: Set package version
+        if: steps.existing.outputs.found != 'true'
         env:
           CHANNEL: ${{ inputs.channel }}
           NODE_AUTH_TOKEN: ${{ github.token }}
           RUN_NUMBER: ${{ github.run_number }}
-          VERSION_BUMP: ${{ inputs.version_bump }}
+          SOURCE_RUN: ${{ steps.release.outputs.source_run }}
+          VERSION_BUMP: ${{ steps.release.outputs.version_bump }}
         run: |
           package=$(node -p "require('./package.json').name")
           current=$(npm view "$package" dist-tags.latest --registry="$REGISTRY_URL" 2>/dev/null || true)
@@ -108,16 +203,22 @@ jobs:
           fi
           version=$(npm exec --yes --package=semver -- semver "$current" -i "$VERSION_BUMP")
           if [ "$CHANNEL" = beta ]; then
-            version="$version-beta.$RUN_NUMBER"
+            prerelease_id=$RUN_NUMBER
+            if [ -n "$SOURCE_RUN" ]; then
+              prerelease_id="sds.$SOURCE_RUN"
+            fi
+            version="$version-beta.$prerelease_id"
           fi
           npm version "$version" --no-git-tag-version
 
       - name: Validate package
+        if: steps.existing.outputs.found != 'true'
         env:
           VALIDATION_COMMAND: ${{ inputs.validation_command }}
         run: bash -euo pipefail -c "$VALIDATION_COMMAND"
 
       - name: Check package version
+        if: steps.existing.outputs.found != 'true'
         id: package
         env:
           NODE_AUTH_TOKEN: ${{ github.token }}
@@ -134,6 +235,7 @@ jobs:
           } >> "$GITHUB_OUTPUT"
 
       - name: Build package artifact
+        if: steps.existing.outputs.found != 'true'
         id: pack
         run: |
           tarball=$(npm pack --ignore-scripts --json | node -e '
@@ -144,6 +246,7 @@ jobs:
           echo "tarball=$tarball" >> "$GITHUB_OUTPUT"
 
       - name: Publish package
+        if: steps.existing.outputs.found != 'true'
         env:
           CHANNEL: ${{ inputs.channel }}
           NODE_AUTH_TOKEN: ${{ github.token }}
@@ -156,11 +259,13 @@ jobs:
           npm publish "./$TARBALL" --ignore-scripts --tag "$tag"
 
       - name: Create GitHub release
+        if: steps.existing.outputs.found != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
           CHANNEL: ${{ inputs.channel }}
           PACKAGE_NAME: ${{ steps.package.outputs.name }}
           PACKAGE_VERSION: ${{ steps.package.outputs.version }}
+          SDS_VERSION: ${{ steps.release.outputs.sds_version }}
           TARBALL: ${{ steps.pack.outputs.tarball }}
         run: |
           release_args=()
@@ -168,14 +273,18 @@ jobs:
             release_args+=(--prerelease)
           fi
           target=$(git rev-parse HEAD)
+          release_args+=(--generate-notes)
+          if [ -n "$SDS_VERSION" ]; then
+            release_args+=(--notes "SDS-Version: $SDS_VERSION")
+          fi
           gh release create "v$PACKAGE_VERSION" "./$TARBALL" \
             --repo "$GITHUB_REPOSITORY" \
             --target "$target" \
             --title "$PACKAGE_NAME@$PACKAGE_VERSION" \
-            --generate-notes \
             "${release_args[@]}"
 
       - name: Summarize release
+        if: steps.existing.outputs.found != 'true'
         env:
           CHANGED: ${{ steps.sds.outputs.changed }}
           CURRENT_SDS: ${{ steps.sds.outputs.current }}
@@ -190,3 +299,9 @@ jobs:
             echo "SDS packaged: $LATEST_SDS"
             echo "SDS updated: $CHANGED"
           } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Summarize duplicate event
+        if: steps.existing.outputs.found == 'true'
+        env:
+          SDS_VERSION: ${{ steps.release.outputs.sds_version }}
+        run: echo "No release needed. The current channel already packages SDS $SDS_VERSION." >> "$GITHUB_STEP_SUMMARY"
