@@ -73,7 +73,12 @@ jobs:
             next_core=$(npm exec --yes --package=semver -- semver "$SDS_VERSION")
             next_core=${next_core%%-*}
             next_core=${next_core%%+*}
-            npm exec --yes --package=semver -- semver "$next_core" -r ">$previous_core" >/dev/null
+            # SDS betas are cut from develop as <last production>-beta.<sha>, so the core may equal previous
+            range=">$previous_core"
+            if [ "$CHANNEL" = beta ]; then
+              range=">=$previous_core"
+            fi
+            npm exec --yes --package=semver -- semver "$next_core" -r "$range" >/dev/null
 
             previous_major=${previous_core%%.*}
             previous_minor_patch=${previous_core#*.}
